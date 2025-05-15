@@ -1,0 +1,13 @@
+# Expose PostgreSQL to other Pods
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - protocol: TCP
+      port: 5432 #PosgreSQL Default Port
+      targetPort: 5432 
+  type: ClusterIP

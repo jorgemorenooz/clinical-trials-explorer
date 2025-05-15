@@ -2,7 +2,7 @@
 
 A cloud-native platform for exploring, managing, and analyzing clinical trials data. It combines modern web technologies, healthcare interoperability standards (FHIR), and AI-driven analytics to simulate real-world clinical informatics solutions.
 
-This project was developed as a personal initiative to apply computer science principles in the context of clinical trial regulation and health informatics. It serves as a technical demonstration aligned with trainee roles in research and innovation (e.g., at the European Medicines Agency).
+This project was developed as a personal initiative to apply computer science principles in the context of clinical trial regulation and health informatics. It serves as a technical demonstration aligned with trainee roles in research and innovation at the European Medicines Agency.
 
 ---
 
@@ -33,6 +33,7 @@ This project was developed as a personal initiative to apply computer science pr
 ## 📁 Project Structure
 
 clinical-trials-explorer/
+├── k8s/postgres/ # Kubernetes YAML files for PostgreSQL Service
 ├── backend/ # FastAPI backend and RESTful logic
 ├── frontend/ # React application
 ├── fhir_module/ # FHIR data conversion adapters
@@ -47,7 +48,7 @@ clinical-trials-explorer/
 
 ## 🚧 Project Phases
 
-### ✅ Phase 1: Design & Planning *(in progress)*
+### ✅ Phase 1: Design & Planning
 - [x] GitHub repository setup
 - [x] Define tech stack and project scope
 - [x] Draft initial architecture diagram
@@ -101,3 +102,112 @@ This project is under active development as part of a personal portfolio to demo
 ## 📄 License
 
 MIT License — feel free to use and adapt for educational purposes.
+
+## 1️⃣ Phase 1: Design & Planning
+
+### ✅ Step 1: MVP Scope for Clinical Trials Explorer
+- Users can create, read, update, and delete simulated clinical trial entries via a REST API.
+- The backend provides a RESTful interface, exposing clinical trial data in a structured JSON format.
+- The system can fetch and display real clinical trials from ClinicalTrials.gov using their public API.
+- The frontend web app (React) allows users to view and filter clinical trials from both local and external sources.
+- The backend includes an endpoint that returns clinical trials in FHIR-compatible format (e.g., ResearchStudy resource).
+- All components (frontend, backend, data access) are modular, and the system can be deployed locally or to the cloud.
+
+While real-time data is fetched from ClinicalTrials.gov for technical demonstration purposes, this application is conceptually aligned with EMA’s CTIS platform and the EU Clinical Trials Regulation.
+
+---
+
+### ✅ Step 2: Designing the `ClinicalTrial` Data Model
+
+The main data entity in this application is a `ClinicalTrial`, structured to reflect core fields aligned with clinical research standards and compatible with future FHIR transformation.
+
+#### 📄 Fields
+
+- `id` — unique identifier (UUID or numeric)
+- `official_title` — full official title of the trial
+- `acronym` — short name or abbreviation
+- `disease_area` — condition being studied (e.g., Diabetes)
+- `trial_phase` — clinical phase (e.g., Phase I, II, III)
+- `status` — current status (Ongoing, Completed, etc.)
+- `start_date` — trial start date
+- `end_date` — trial end date
+- `country` — where the trial is conducted
+- `sponsor` — sponsoring organization or entity
+- `description` — full protocol or study summary
+
+---
+
+### ✅ Step 3: Choosing and Deploying the Database
+PostgreSQL was selected over NoSQL solutions due to:
+
+- Structured schema enforcement
+- Strong support for complex queries (filtering by status, phase, etc.)
+- Easy integration with healthcare data standards like **FHIR**
+- Compatibility with both local development and future **cloud migration (Azure/AWS)**
+
+To avoid installing a local PostgreSQL client, the database is deployed **inside a Kubernetes cluster** using **Minikube** and containerized via the official `postgres:15` image.
+
+---
+
+#### 🧰 Tools Used
+
+- [Minikube](https://minikube.sigs.k8s.io/docs/start/) — local Kubernetes cluster
+- [Docker](https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe?utm_source=docker&utm_medium=webreferral&utm_campaign=docs-driven-download-win-amd64) — used as the container runtime for Minikube
+- kubectl — Kubernetes CLI
+- PostgreSQL 15 — running as a pod inside Kubernetes
+- Kubernetes YAML manifests — to define `Secret`, `PVC`, `Deployment`, and `Service` in `k8s/postgres`
+
+---
+
+#### 🔧 Install Minikube on Windows
+Start Minikube with Docker driver:
+
+   ```powershell
+   minikube start --driver=docker
+   ```
+
+Verify the cluster is running:
+
+   ```powershell
+   kubectl get nodes
+   ```
+
+---
+
+#### 🚀 Deploy PostgreSQL to Minikube
+Apply the Kubernetes manifests (defined in `k8s/postgres`) to deploy the PostgreSQL database and its supporting resources:
+
+   ```powershell
+   kubectl apply -f k8s/postgres/
+   ```
+
+This will create:
+
+- A Kubernetes Secret with the database credentials
+- A PersistentVolumeClaim for PostgreSQL data
+- A Deployment running the postgres:15 container
+- A Service to expose PostgreSQL within the cluster
+
+In order to verify that PostgreSQL is accessible by launching a temporary pod and connecting to the service:
+
+   ```powershell
+   kubectl run test-client --rm -it --image=postgres:15 -- bash
+   ```
+Then inside the container::
+
+   ```powershell
+   psql -h postgres -U postgres -d clinical_trials
+   # password: postgres
+   ```
+
+---
+
+#### 📄 View Logs (Optional)
+
+To confirm it started properly and the env vars (from the secret) are working:
+
+   ```powershell
+   kubectl logs deployment/postgres
+   ```
+
+We are looking for log lines like: `PostgreSQL init process complete; ready for start up.`
