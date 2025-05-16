@@ -8,6 +8,6 @@ spec:
     app: postgres
   ports:
     - protocol: TCP
-      port: 5432 #PosgreSQL Default Port
-      targetPort: 5432 
+      port: 5432 # The port this Service exposes (within the cluster)
+      targetPort: 5432 # The port inside the container (the containerPort from Deployment)
   type: ClusterIP

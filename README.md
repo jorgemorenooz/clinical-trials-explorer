@@ -162,13 +162,13 @@ To avoid installing a local PostgreSQL client, the database is deployed **inside
 #### 🔧 Install Minikube on Windows
 Start Minikube with Docker driver:
 
-   ```powershell
+   ```bash
    minikube start --driver=docker
    ```
 
 Verify the cluster is running:
 
-   ```powershell
+   ```bash
    kubectl get nodes
    ```
 
@@ -177,7 +177,7 @@ Verify the cluster is running:
 #### 🚀 Deploy PostgreSQL to Minikube
 Apply the Kubernetes manifests (defined in `k8s/postgres`) to deploy the PostgreSQL database and its supporting resources:
 
-   ```powershell
+   ```bash
    kubectl apply -f k8s/postgres/
    ```
 
@@ -190,12 +190,12 @@ This will create:
 
 In order to verify that PostgreSQL is accessible by launching a temporary pod and connecting to the service:
 
-   ```powershell
+   ```bash
    kubectl run test-client --rm -it --image=postgres:15 -- bash
    ```
 Then inside the container::
 
-   ```powershell
+   ```bash
    psql -h postgres -U postgres -d clinical_trials
    # password: postgres
    ```
@@ -206,8 +206,267 @@ Then inside the container::
 
 To confirm it started properly and the env vars (from the secret) are working:
 
-   ```powershell
+   ```bash
    kubectl logs deployment/postgres
    ```
 
 We are looking for log lines like: `PostgreSQL init process complete; ready for start up.`
+
+---
+
+### ✅ Step 4: FastAPI Backend Setup
+Setting up a FastAPI application will:
+- Connect to our PostgreSQL database
+- Define your ClinicalTrial data model
+- Expose CRUD endpoints for clinical trials
+
+---
+
+#### Create backend structure
+
+In our project, In order to keep things clean and scalable, database logic (`database.py`), models (`models.py`), schemas (`schemas.py`), and API logic (`main.py`) will be separated
+:
+
+   ```bash
+   clinical-trials-explorer/
+    └── backend/
+        ├── app/
+        │   ├── main.py
+        │   ├── models.py
+        │   ├── database.py
+        │   ├── crud.py
+        │   ├── schemas.py
+        │   └── config.py
+        └── requirements.txt
+   ```
+
+---
+
+#### Install required dependencies
+
+It is recommended to use a virtual environment:
+
+   ```bash
+   python -m venv myenv
+   source myenv/bin/activate  # or myenv\Scripts\activate on Windows
+   ```
+
+Then we can install the dependencies and save them:
+
+   ```bash
+   python.exe -m pip install --upgrade pip # Upgrade pip first
+   pip install fastapi[all] sqlalchemy psycopg2-binary python-dotenv # Install dependencies
+   pip freeze > requirements.txt  # save them
+   ```
+
+---
+
+#### Setup Database Connection
+Create a `database.py` file that handles:
+
+- Connecting to PostgreSQL
+- Creating a SessionLocal object to interact with the DB
+- Managing the SQLAlchemy engine and Base
+
+In backend/app/database.py, we will define:
+
+1. DATABASE_URL from environment variable (.env file so app logic and environment-specific settings stay separate)
+2. SQLAlchemy engine
+3. SessionLocal class (your DB session factory)
+4. Base object for your ORM models
+5. get_db() function to automatically open and close the DB session
+
+---
+
+#### Define `ClinicalTrial` Model
+Create a `models.py` file that will:
+
+- Inherit from Base (defined in `database.py`)
+- Map to a database table (e.g., clinical_trials)
+- Match the fields defined in [📄 Fields](#-fields)
+
+---
+
+#### Define Schemas
+Create a `schemas.py` file to define the **data shape used in the API**, using Pydantic.
+
+This separates:
+- Internal database logic (`models.py`)
+- External input/output validation (`schemas.py`)
+
+We will define three schemas:
+
+| Schema               | Purpose                              |
+|----------------------|--------------------------------------|
+| `ClinicalTrialBase`  | Shared fields for creation and output |
+| `ClinicalTrialCreate`| Inherits from base, used for POST    |
+| `ClinicalTrial`      | Adds `id`, used for GET responses     |
+
+The `ClinicalTrial` schema uses:
+
+It is recommended to use a virtual environment:
+
+   ```python
+    class Config:
+        orm_mode = True
+   ```
+
+---
+
+#### FastAPI entrypoint in `main.py`
+
+# https://www.linkedin.com/pulse/mapping-pydantic-models-sqlalchemy-other-orm-alembic-herman-varzari-fnspf/ For Mapping Pydantic models to SQLAlchemy models
+
+#### Test the API
+If not run, start Minikube with Docker driver:
+
+   ```bash
+   minikube start --driver=docker
+   ```
+
+Verify the cluster is running:
+
+   ```bash
+   kubectl get nodes
+   ```
+
+Expose the postgres service, connection can be tested running the file `test_conn.py`:
+
+   ```bash
+   minikube service postgres --url
+   ```
+
+This creates a temporary tunnel from a random high port the host, copy the URL in the `.env` file `DATABASE_URL=postgresql://postgres:postgres@$host:$port/clinical_trials`
+
+Run the FastAPI app:
+
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+We will see `GET /trials` and `POST /trials`, being able to click them and test them.
+
+---
+
+#### ❌❌❌❌Automate minikube tunnel to expose services automatically at startup
+
+---
+
+### ✅ Step 5: API Endpoints (CRUD)
+
+#### `GET /trials`
+
+```http
+   GET /trials/
+```
+
+Returns a list of all clinical trials in the database.
+
+   ```json
+      [
+         {
+            "id": 1,
+            "official_title": "Trial A",
+            "acronym": "TA",
+            "disease_area": "Diabetes",
+            ...
+         }
+      ]
+   ```
+
+---
+
+#### `GET /trials/{id}`
+
+```http
+   GET /trials/1
+```
+
+Returns a single trial by ID.<br>
+**Response**:
+
+   ```json
+      {
+         "official_title": "Trial A",
+         "acronym": "TA",
+         "disease_area": "Diabetes",
+         "trial_phase": "Phase II",
+         "status": "Ongoing",
+         "start_date": "2023-05-01",
+         "end_date": "2024-05-01",
+         "country": "Germany",
+         "sponsor": "University X",
+         "description": "Study of X in Y population",
+         "id": 1
+      }
+   ```
+
+**Errors**:
+- `404 Not Found` if ID does not exist
+
+---
+
+#### `POST /trials`
+
+```http
+   POST /trials
+```
+
+Creates a new clinical trial.<br>
+**Request Body**:
+
+   ```json
+      {
+         "official_title": "Trial A",
+         "acronym": "TA",
+         "disease_area": "Diabetes",
+         "trial_phase": "Phase II",
+         "status": "Ongoing",
+         "start_date": "2023-05-01",
+         "end_date": "2024-05-01",
+         "country": "Germany",
+         "sponsor": "University X",
+         "description": "Study of X in Y population",
+      }
+   ```
+
+**Response**: Same as `GET /trials/{id}`
+
+---
+
+#### `PUT /trials/{id}`
+
+```http
+   PUT /trials/1
+```
+
+Replaces all fields of an existing clinical trial.
+
+**Request Body**: Same as `POST /trials/`
+
+**Response**: Updated trial object
+
+**Errors**:
+- `404 Not Found` if ID does not exist
+
+---
+
+#### `DELETE /trials/{id}`
+
+```http
+   DELETE /trials/1
+```
+
+Deletes a trial by ID.
+
+**Response**:
+```json
+   {
+      "message": "Trial deleted"
+   }
+```
+
+**Errors**:
+- `404 Not Found` if ID does not exist
+
+---
