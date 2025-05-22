@@ -470,3 +470,66 @@ Deletes a trial by ID.
 - `404 Not Found` if ID does not exist
 
 ---
+
+#### `GET /trials` with Optional Filters
+✅ Test cases:
+
+Try these in Swagger or your browser:
+
+    /trials → all trials
+
+    /trials?disease_area=Diabetes
+
+    /trials?status=Ongoing&country=Spain
+
+#### Add Pagination to `GET /trials`
+
+#### Improve Response Formatting
+
+This makes it easier for clients (frontend, scripts, users) to:
+
+    Show total pages
+
+    Display current range
+
+    Know if more data exists
+
+---
+
+### 🐳 Phase 5: Containerize FastAPI
+
+#### Write Dockerfile for FastAPI
+
+#### Add .dockerignore
+
+#### Build and test FastAPI image locally
+
+    Push image to Docker Hub (optional)
+
+### ☸️ Phase 6: Deploy FastAPI to Kubernetes
+
+#### Create Kubernetes YAMLs:
+
+#### Deployment for FastAPI
+
+#### Service for internal communication
+
+    ConfigMap or Secret for DATABASE_URL
+
+#### Connect FastAPI to PostgreSQL via K8s DNS (postgres)
+
+#### Expose FastAPI (NodePort)
+
+    Test full cluster deployment: FastAPI ↔ PostgreSQL
+
+### 📄 Phase 7: Final Polish & Optional Extras
+
+#### Write API docs in Swagger tags or OpenAPI metadata
+
+#### Add unit tests with pytest
+
+#### Add external data support (clinicaltrials.gov)
+
+#### Architecture diagram
+
+#### Optional: Frontend (React, HTMX, or Swagger-only)
