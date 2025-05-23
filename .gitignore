@@ -4,4 +4,5 @@ myenv/
 __pycache__/
 start-postgres-proxy.ps1
 postgres_url.txt
-.vscode/settings.json
+.vscode/
+.pytest_cache/

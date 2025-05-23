@@ -105,7 +105,7 @@ MIT License — feel free to use and adapt for educational purposes.
 
 ## 1️⃣ Phase 1: Design & Planning
 
-### ✅ Step 1: MVP Scope for Clinical Trials Explorer
+### ✅ Phase 1: MVP Scope for Clinical Trials Explorer
 - Users can create, read, update, and delete simulated clinical trial entries via a REST API.
 - The backend provides a RESTful interface, exposing clinical trial data in a structured JSON format.
 - The system can fetch and display real clinical trials from ClinicalTrials.gov using their public API.
@@ -117,7 +117,7 @@ While real-time data is fetched from ClinicalTrials.gov for technical demonstrat
 
 ---
 
-### ✅ Step 2: Designing the `ClinicalTrial` Data Model
+### ✅ Phase 2: Designing the `ClinicalTrial` Data Model
 
 The main data entity in this application is a `ClinicalTrial`, structured to reflect core fields aligned with clinical research standards and compatible with future FHIR transformation.
 
@@ -137,7 +137,7 @@ The main data entity in this application is a `ClinicalTrial`, structured to ref
 
 ---
 
-### ✅ Step 3: Choosing and Deploying the Database
+### ✅ Phase 3: Choosing and Deploying the Database
 PostgreSQL was selected over NoSQL solutions due to:
 
 - Structured schema enforcement
@@ -214,7 +214,7 @@ We are looking for log lines like: `PostgreSQL init process complete; ready for 
 
 ---
 
-### ✅ Step 4: FastAPI Backend Setup
+### ✅ Phase 4: FastAPI Backend Setup
 Setting up a FastAPI application will:
 - Connect to our PostgreSQL database
 - Define your ClinicalTrial data model
@@ -348,11 +348,7 @@ We will see `GET /trials` and `POST /trials`, being able to click them and test 
 
 ---
 
-#### ❌❌❌❌Automate minikube tunnel to expose services automatically at startup
-
----
-
-### ✅ Step 5: API Endpoints (CRUD)
+### ✅ Phase 5: API Endpoints (CRUD)
 
 #### `GET /trials`
 
@@ -472,57 +468,160 @@ Deletes a trial by ID.
 ---
 
 #### `GET /trials` with Optional Filters
-✅ Test cases:
+We can test filters directly:
 
-Try these in Swagger or your browser:
-
-    /trials → all trials
-
-    /trials?disease_area=Diabetes
-
-    /trials?status=Ongoing&country=Spain
+```pgsql
+   /trials                         → Get all trials  
+   /trials?disease_area=Diabetes  → Filter by disease area  
+   /trials?status=Ongoing&country=Spain → Combine filters
+```
 
 #### Add Pagination to `GET /trials`
+Adds limit and offset query parameters:
+
+```bash
+   /trials?limit=10&offset=20
+```
 
 #### Improve Response Formatting
+All list responses are wrapped in metadata:
+Helps frontend and consumers to:
+- Show total pages
+- Display current range
+- Know if more data exists
 
-This makes it easier for clients (frontend, scripts, users) to:
-
-    Show total pages
-
-    Display current range
-
-    Know if more data exists
+```json
+   {
+   "total": 80,
+   "limit": 10,
+   "offset": 0,
+   "data": [ ... ]
+   }
+```
 
 ---
 
-### 🐳 Phase 5: Containerize FastAPI
+### 🐳 Phase 6: Containerize FastAPI
 
 #### Write Dockerfile for FastAPI
 
+```Dockerfile
+   FROM python:3.12-slim
+   WORKDIR /code
+   COPY requirements.txt .
+   RUN pip install --no-cache-dir -r requirements.txt
+   COPY ./app ./app
+   EXPOSE 8000
+   CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+---
+
 #### Add .dockerignore
+
+```dockerignore
+   __pycache__/
+   *.pyc
+   .env
+   .git
+   *.db
+```
+
+---
 
 #### Build and test FastAPI image locally
 
-    Push image to Docker Hub (optional)
+```bash
+   docker build -t clinical-api .
+   docker run -p 8000:8000 --env-file .env clinical-api
+```
 
-### ☸️ Phase 6: Deploy FastAPI to Kubernetes
+---
+
+#### Push image to Docker Hub
+
+```bash
+   docker tag clinical-api username/clinical-api
+   docker push username/clinical-api
+```
+
+---
+
+### ☸️ Phase 7: Deploy FastAPI to Kubernetes
 
 #### Create Kubernetes YAMLs:
 
+- Deployment: `k8s/fastapi/deployment.yaml`
+- Service: `k8s/fastapi/service.yaml`
+
+---
+
 #### Deployment for FastAPI
+File: `k8s/fastapi/deployment.yaml`
+
+- Runs FastAPI in a container
+- Pulls image locally or from Docker Hub
+- Injects DATABASE_URL from a Kubernetes Secret
+
+```yaml
+   env:
+    - name: DATABASE_URL
+      valueFrom:
+         secretKeyRef:
+         name: postgres-secret
+         key: DATABASE_URL
+```
+
+---
 
 #### Service for internal communication
+File: k8s/fastapi/service.yaml
 
-    ConfigMap or Secret for DATABASE_URL
+- Type: NodePort for development
+- Routes external traffic to our FastAPI pod
+- Also allows other pods (like React frontend or test jobs) to connect internally
 
-#### Connect FastAPI to PostgreSQL via K8s DNS (postgres)
+ConfigMap or Secret for DATABASE_URL is used to keep credentials out of the deployment file:
+
+```yaml
+   DATABASE_URL: <base64-encoded-URL>
+```
+
+Decoded URL looks like:
+
+```yaml
+   postgresql://postgres:postgres@postgres:5432/clinical_trials
+```
+The hostname postgres is automatically resolved to the PostgreSQL service inside Kubernetes.
+
+---
 
 #### Expose FastAPI (NodePort)
+Expose the app locally using Minikube:
 
-    Test full cluster deployment: FastAPI ↔ PostgreSQL
+```bash
+   minikube service fastapi --url
+```
 
-### 📄 Phase 7: Final Polish & Optional Extras
+We will get a URL like: `http://127.0.0.1:62119`, we can use that to hit your live FastAPI API in the browser `http://127.0.0.1:62119/docs`
+
+---
+
+#### Full cluster deployment: FastAPI ↔ PostgreSQL
+Once deployed, the full communication flow looks like this:
+
+```text
+   Client (browser or test) 
+      ↓
+   FastAPI (NodePort Service → Pod)
+      ↓
+   PostgreSQL (ClusterIP Service → Pod)
+```
+Everything is containerized, connected via K8s DNS (postgres), and ready for production or local development.
+
+---
+
+### 📄 Phase 8: Final Polish & Optional Extras
 
 #### Write API docs in Swagger tags or OpenAPI metadata
 
